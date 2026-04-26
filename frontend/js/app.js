@@ -1,5 +1,5 @@
 // API base URL - change this to your backend URL when deployed
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://parcel-backend-4bc7.onrender.com/api';
 
 // Global variables
 let socket;
@@ -12,7 +12,7 @@ let marker;
 
 // Initialize Socket.io connection
 function initSocket() {
-    socket = io('http://localhost:5000');
+    socket = io('https://parcel-backend-4bc7.onrender.com');
 
     socket.on('connect', function() {
         console.log('Connected to server');
