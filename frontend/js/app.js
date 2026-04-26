@@ -122,8 +122,14 @@ async function loadParcels() {
                 <td><span class="badge status-${parcel.status.toLowerCase().replace(' ', '-')}">${parcel.status}</span></td>
                 <td>${parcel.driverId || 'Not assigned'}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openAssignDriverModal('${parcel.parcelId}')">Assign Driver</button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="openUpdateStatusModal('${parcel.parcelId}')">Update Status</button>
+                    <div class="btn-group shadow-sm" role="group">
+                        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" onclick="openAssignDriverModal('${parcel.parcelId}')">
+                            <span style="font-size: 1.1em;">👤</span> Assign Driver
+                        </button>
+                        <button class="btn btn-sm btn-info text-white d-flex align-items-center gap-1" onclick="openUpdateStatusModal('${parcel.parcelId}')" style="background-color: #0EA5E9; border-color: #0EA5E9;">
+                            <span style="font-size: 1.1em;">🔄</span> Update Status
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -244,8 +250,14 @@ async function loadDrivers() {
                 <td>${driver.latitude ?? 'N/A'}</td>
                 <td>${driver.longitude ?? 'N/A'}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditDriverModal('${driver.driverId}')">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteDriver('${driver.driverId}')">Delete</button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1" onclick="openEditDriverModal('${driver.driverId}')">
+                            ✏️ Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3 d-flex align-items-center gap-1" onclick="deleteDriver('${driver.driverId}')">
+                            🗑️ Delete
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');

@@ -26,6 +26,7 @@ body {
 /* Navbar */
 .navbar {
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
+    background-color: #1E40AF !important;
 }
 
 .navbar .navbar-brand {
@@ -268,4 +269,60 @@ body {
     .table-responsive {
         font-size: 0.92rem;
     }
+}
+
+/* Custom Metric Card Colors */
+.card-total {
+    background-color: #2563EB !important; /* Blue */
+    color: #ffffff !important;
+    border: none;
+}
+.card-total .metric-label, .card-total .metric-value {
+    color: #ffffff !important;
+}
+.card-total .metric-icon {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+.card-pending {
+    background-color: #EAB308 !important; /* Yellow */
+    color: #ffffff !important;
+    border: none;
+}
+.card-pending .metric-label, .card-pending .metric-value {
+    color: #ffffff !important;
+}
+.card-pending .metric-icon {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+.card-intransit {
+    background-color: #87CEEB !important; /* Light Blue */
+    color: #0F172A !important;
+    border: none;
+}
+.card-intransit .metric-label {
+    color: #334155 !important;
+}
+.card-intransit .metric-value {
+    color: #0F172A !important;
+}
+.card-intransit .metric-icon {
+    background: rgba(15, 23, 42, 0.1) !important;
+    color: #0F172A !important;
+}
+
+.card-delivered {
+    background-color: #22C55E !important; /* Green */
+    color: #ffffff !important;
+    border: none;
+}
+.card-delivered .metric-label, .card-delivered .metric-value {
+    color: #ffffff !important;
+}
+.card-delivered .metric-icon {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
 }
