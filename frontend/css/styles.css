@@ -23,10 +23,18 @@ body {
     color: var(--app-text);
 }
 
+.driver-dashboard-bg {
+    background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+    min-height: 100vh;
+}
+
 /* Navbar */
 .navbar {
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
-    background-color: #1E40AF !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    background: rgba(30, 64, 175, 0.85) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .navbar .navbar-brand {
@@ -60,10 +68,18 @@ body {
 
 /* Cards */
 .card {
-    background: var(--app-card);
-    border: 1px solid var(--app-border);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: var(--app-radius);
     box-shadow: var(--app-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(15, 23, 42, 0.1);
 }
 
 .card-header {
@@ -132,6 +148,12 @@ body {
 .form-select:focus {
     border-color: rgba(34, 197, 94, 0.70);
     box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.18);
+}
+
+/* Fix dropdown option visibility */
+.form-select option {
+    background-color: #FFFFFF;
+    color: #1F2937;
 }
 
 /* Buttons */
@@ -228,6 +250,11 @@ body {
 
 .status-delivered {
     background-color: #16A34A;
+    color: #fff;
+}
+
+.status-cancelled {
+    background-color: #EF4444;
     color: #fff;
 }
 

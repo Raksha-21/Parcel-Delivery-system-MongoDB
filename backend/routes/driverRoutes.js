@@ -3,6 +3,7 @@ const router = express.Router();
 const Driver = require('../models/Driver');
 const Parcel = require('../models/Parcel');
 const Tracking = require('../models/Tracking');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 const LEGACY_DEFAULT_LAT = 40.7128;
 const LEGACY_DEFAULT_LNG = -74.0060;
@@ -37,7 +38,7 @@ async function geocodeLocation(locationName) {
 }
 
 // Add a new driver
-router.post('/add', async (req, res) => {
+router.post('/add', protect, restrictTo('admin'), async (req, res) => {
   try {
     const { driverId, name, phone, vehicleNumber, routeId, latitude, longitude, locationName } = req.body;
 
@@ -91,7 +92,7 @@ router.post('/add', async (req, res) => {
 });
 
 // View all drivers
-router.get('/', async (req, res) => {
+router.get('/', protect, restrictTo('admin'), async (req, res) => {
   try {
     const drivers = await Driver.find();
     res.status(200).json(drivers);
@@ -101,7 +102,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update driver
-router.put('/:driverId', async (req, res) => {
+router.put('/:driverId', protect, restrictTo('admin'), async (req, res) => {
   try {
     const { driverId } = req.params;
     const updates = { ...req.body };
@@ -176,7 +177,7 @@ router.put('/:driverId', async (req, res) => {
           await onlyTracking.save();
 
           const io = req.app.get('io');
-          io.emit('locationUpdate', {
+          io.emit('locationUpdated', {
             parcelId: parcel.parcelId,
             latitude: onlyTracking.latitude,
             longitude: onlyTracking.longitude,
@@ -193,7 +194,7 @@ router.put('/:driverId', async (req, res) => {
 });
 
 // Delete driver
-router.delete('/:driverId', async (req, res) => {
+router.delete('/:driverId', protect, restrictTo('admin'), async (req, res) => {
   try {
     const { driverId } = req.params;
 

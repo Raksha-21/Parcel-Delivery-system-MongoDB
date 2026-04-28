@@ -1,5 +1,5 @@
 // API base URL - change this to your backend URL when deployed
-const API_BASE_URL = 'https://parcel-backend-4bc7.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Global variables
 let socket;
@@ -8,11 +8,10 @@ let currentDriverId = null;
 let currentParcelStatus = null;
 let currentDestinationName = null;
 let map;
-let marker;
 
 // Initialize Socket.io connection
 function initSocket() {
-    socket = io('https://parcel-backend-4bc7.onrender.com');
+    socket = io('http://localhost:5000');
 
     socket.on('connect', function() {
         console.log('Connected to server');
@@ -23,12 +22,20 @@ function initSocket() {
     });
 
     // Listen for real-time location updates
-    socket.on('locationUpdate', function(data) {
+    socket.on('locationUpdated', function(data) {
         console.log('Location update received:', data);
+        
+        // If we are tracking a specific parcel (Customer/Admin specific view)
         if (currentParcelId === data.parcelId && currentParcelStatus !== 'Delivered') {
-            updateMapMarker(data.latitude, data.longitude, {
+            updateMapMarker(data.parcelId, data.latitude, data.longitude, {
                 locationName: data.locationName,
                 destinationName: currentDestinationName
+            });
+        } 
+        // If Admin is viewing all parcels on a map (if applicable)
+        else if (!currentParcelId && typeof updateMapMarker === 'function') {
+            updateMapMarker(data.parcelId, data.latitude, data.longitude, {
+                locationName: data.locationName
             });
         }
     });

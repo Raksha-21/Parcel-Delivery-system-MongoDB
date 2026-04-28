@@ -214,6 +214,30 @@ The application uses Socket.io for real-time updates:
 - When a driver updates location, all connected clients receive live updates
 - Map markers update automatically without page refresh
 
+## Authorization & Tracking Security
+
+We implemented role-based access control (RBAC) to ensure parcel data remains secure and private. 
+
+### How and Why We Used It
+**Why:** Parcel details (like sender, receiver, locations) are sensitive. We want to ensure that a customer cannot simply guess a Parcel ID or query the API to view another person's delivery.
+**How:**
+- When a user logs in as a `customer`, their identity (`name`) is attached to their session.
+- When the frontend requests a list of parcels (`GET /api/parcels`), the backend dynamically filters the database using MongoDB's `$or` operator:
+  ```javascript
+  $or: [
+    { senderName: req.user.name },
+    { receiverName: req.user.name }
+  ]
+  ```
+- This ensures that the backend *only* returns parcels where the customer's name exactly matches either the sender or the receiver. 
+- The direct tracking API (`GET /api/parcels/tracking/:parcelId`) also verifies ownership before returning any coordinates.
+
+### Use Example for Testing
+1. **Create a Parcel:** Log in as an `admin` (or register one). Create a parcel where the Sender is "Alice" and the Receiver is "Bob".
+2. **Track as Sender:** Log out, then register/log in as a customer named "Alice". Go to Parcel Tracking. Entering the Parcel ID will successfully show the tracking map.
+3. **Track as Receiver:** Log out, then register/log in as a customer named "Bob". Go to Parcel Tracking. Entering the Parcel ID will also work!
+4. **Unauthorized Access Test:** Log out, then register/log in as a customer named "Charlie". Enter the exact same Parcel ID. The system will reject the request and show "Parcel not found" because Charlie is neither the sender nor the receiver.
+
 ## Deployment
 
 ### Backend (Render)
