@@ -3,6 +3,7 @@ const router = express.Router();
 const Parcel = require('../models/Parcel');
 const Driver = require('../models/Driver');
 const Tracking = require('../models/Tracking');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 async function geocodeLocation(locationName) {
   const encodedLocation = encodeURIComponent(locationName.trim());
@@ -34,7 +35,7 @@ async function geocodeLocation(locationName) {
 }
 
 // Add a new parcel
-router.post('/add', async (req, res) => {
+router.post('/add', protect, restrictTo('admin'), async (req, res) => {
   try {
     const { parcelId, senderName, receiverName, pickupAddress, deliveryAddress, weight } = req.body;
 
@@ -66,9 +67,47 @@ router.post('/add', async (req, res) => {
 });
 
 // View all parcels
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
-    const parcels = await Parcel.find();
+    let query = {};
+    if (req.user.role === 'customer') {
+      // Customers can only see parcels where they are the sender or receiver
+      query = {
+        $or: [
+          { senderName: req.user.name },
+          { receiverName: req.user.name }
+        ]
+      };
+    }
+    const parcels = await Parcel.find(query);
+    res.status(200).json(parcels);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// View parcels for logged in driver
+router.get('/driver-parcels', protect, restrictTo('driver'), async (req, res) => {
+  try {
+    const driverId = req.user.userId;
+    console.log('Fetching parcels for driverId:', driverId);
+    const parcels = await Parcel.find({ driverId });
+    console.log('Found parcels:', parcels.length);
+    res.status(200).json(parcels);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Alias for getting parcels for a specific driver ID
+router.get('/driver/:driverId', protect, restrictTo('driver', 'admin'), async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    // Ensure drivers can only view their own parcels
+    if (req.user.role === 'driver' && req.user.userId !== driverId) {
+      return res.status(403).json({ message: 'Forbidden: You can only view your own parcels' });
+    }
+    const parcels = await Parcel.find({ driverId });
     res.status(200).json(parcels);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -76,7 +115,7 @@ router.get('/', async (req, res) => {
 });
 
 // Assign driver to parcel
-router.put('/assign-driver/:parcelId', async (req, res) => {
+router.put('/assign-driver/:parcelId', protect, restrictTo('admin'), async (req, res) => {
   try {
     const { parcelId } = req.params;
     const { driverId } = req.body;
@@ -110,7 +149,7 @@ router.put('/assign-driver/:parcelId', async (req, res) => {
       });
 
       const io = req.app.get('io');
-      io.emit('locationUpdate', {
+      io.emit('locationUpdated', {
         parcelId,
         latitude: initialTracking.latitude,
         longitude: initialTracking.longitude,
@@ -128,13 +167,13 @@ router.put('/assign-driver/:parcelId', async (req, res) => {
 });
 
 // Update parcel status
-router.put('/update-status/:parcelId', async (req, res) => {
+router.put('/update-status/:parcelId', protect, restrictTo('admin', 'driver'), async (req, res) => {
   try {
     const { parcelId } = req.params;
     const { status } = req.body;
 
     // Validate status
-    const validStatuses = ['Pending', 'In Transit', 'Delivered'];
+    const validStatuses = ['Pending', 'In Transit', 'Delivered', 'Cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -157,13 +196,17 @@ router.put('/update-status/:parcelId', async (req, res) => {
 });
 
 // Update parcel location (for tracking)
-router.post('/update-location', async (req, res) => {
+router.post('/update-location', protect, restrictTo('admin', 'driver'), async (req, res) => {
   try {
-    const { parcelId, driverId, location } = req.body;
+    const { parcelId, driverId, location, latitude, longitude } = req.body;
 
     // Validate required fields
-    if (!parcelId || !driverId || !location || !location.trim()) {
-      return res.status(400).json({ message: 'Parcel ID, driver ID, and location are required' });
+    if (!parcelId || !driverId) {
+      return res.status(400).json({ message: 'Parcel ID and driver ID are required' });
+    }
+    
+    if (!location && (latitude === undefined || longitude === undefined)) {
+       return res.status(400).json({ message: 'Either location name or latitude/longitude is required' });
     }
 
     // Accept location updates only while parcel is in transit.
@@ -183,17 +226,23 @@ router.post('/update-location', async (req, res) => {
     }
 
     let coordinates;
-    try {
-      coordinates = await geocodeLocation(location);
-    } catch (geocodeError) {
-      return res.status(502).json({
-        message: 'Unable to reach geocoding service. Please try again.'
-      });
+    let locName = location ? location.trim() : `Lat: ${latitude}, Lng: ${longitude}`;
+    
+    if (latitude !== undefined && longitude !== undefined) {
+      coordinates = { latitude: Number(latitude), longitude: Number(longitude) };
+    } else {
+      try {
+        coordinates = await geocodeLocation(location);
+      } catch (geocodeError) {
+        return res.status(502).json({
+          message: 'Unable to reach geocoding service. Please try again.'
+        });
+      }
     }
 
     if (!coordinates) {
       return res.status(400).json({
-        message: 'Invalid location name. Please enter a clearer place name.'
+        message: 'Invalid location name or coordinates. Please check inputs.'
       });
     }
 
@@ -201,7 +250,7 @@ router.post('/update-location', async (req, res) => {
     const newTracking = new Tracking({
       parcelId,
       driverId,
-      locationName: location.trim(),
+      locationName: locName,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude
     });
@@ -211,9 +260,9 @@ router.post('/update-location', async (req, res) => {
 
     // Emit real-time update via Socket.io (will be handled in server.js)
     const io = req.app.get('io');
-    io.emit('locationUpdate', {
+    io.emit('locationUpdated', {
       parcelId,
-      locationName: location.trim(),
+      locationName: locName,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       timestamp: newTracking.timestamp
@@ -223,7 +272,7 @@ router.post('/update-location', async (req, res) => {
       message: 'Location updated successfully',
       tracking: newTracking,
       resolvedLocation: {
-        query: location,
+        query: locName,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude
       }
@@ -234,9 +283,17 @@ router.post('/update-location', async (req, res) => {
 });
 
 // Get parcel tracking data
-router.get('/tracking/:parcelId', async (req, res) => {
+router.get('/tracking/:parcelId', protect, async (req, res) => {
   try {
     const { parcelId } = req.params;
+
+    if (req.user.role === 'customer') {
+      const parcel = await Parcel.findOne({ parcelId });
+      if (!parcel || (parcel.senderName !== req.user.name && parcel.receiverName !== req.user.name)) {
+        return res.status(403).json({ message: 'Forbidden: You can only track your own parcels' });
+      }
+    }
+
     const trackingData = await Tracking.find({ parcelId }).sort({ timestamp: -1 });
     res.status(200).json(trackingData);
   } catch (error) {

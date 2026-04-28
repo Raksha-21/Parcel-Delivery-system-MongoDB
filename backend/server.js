@@ -9,6 +9,7 @@ require('dotenv').config();
 // Import routes
 const parcelRoutes = require('./routes/parcelRoutes');
 const driverRoutes = require('./routes/driverRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // Create Express app
 const app = express();
@@ -31,6 +32,7 @@ app.set('io', io);
 // Routes
 app.use('/api/parcels', parcelRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/auth', authRoutes);
 
 // Optional: override DNS resolvers for Atlas SRV lookups.
 // This can help on networks where the default DNS intermittently refuses SRV queries.

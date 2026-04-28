@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="js/auth.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard - Parcel Delivery System</title>
+    <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="driver-dashboard.html">🚚 Parcel Delivery System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="driver-dashboard.html">Driver Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-danger" href="#" id="logoutBtn">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container page-shell">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+            <div>
+                <h1 class="page-title mb-1">Driver Dashboard</h1>
+                <div class="text-muted">Manage your assigned parcels and update their location.</div>
+            </div>
+        </div>
+
+        <div id="message" class="alert d-none" role="alert"></div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>My Assigned Parcels</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Parcel ID</th>
+                                <th>Sender</th>
+                                <th>Receiver</th>
+                                <th>Destination</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="driverParcelsTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading your parcels...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Update Status Modal -->
+    <div class="modal fade" id="updateStatusModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Parcel Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="updateParcelId">
+                    <div class="mb-3">
+                        <label for="statusSelect" class="form-label">New Status</label>
+                        <select class="form-select" id="statusSelect" required>
+                            <option value="Pending">Pending</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateDriverStatus()">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Location Modal -->
+    <div class="modal fade" id="updateLocationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Live Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="locationParcelId">
+                    <p class="text-muted small">Type your current location (e.g. Bangalore)</p>
+                    <div class="mb-3">
+                        <label for="locationInput" class="form-label">Location Name</label>
+                        <input type="text" class="form-control" id="locationInput" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="updateDriverLocation()">Update
+                        Location</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="vendor/socket.io/socket.io.min.js"></script>
+    <script src="js/app.js?v=6"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('logoutBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('userRole');
+                window.location.href = 'index.html';
+            });
+            loadDriverParcels();
+        });
+
+        async function loadDriverParcels() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/parcels/driver-parcels`);
+                const parcels = await response.json();
+
+                const tableBody = document.getElementById('driverParcelsTableBody');
+                if (parcels.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No parcels assigned to you yet.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = parcels.map(parcel => `
+                    <tr>
+                        <td>${parcel.parcelId}</td>
+                        <td>${parcel.senderName}</td>
+                        <td>${parcel.receiverName}</td>
+                        <td>${parcel.deliveryAddress}</td>
+                        <td><span class="badge status-${parcel.status.toLowerCase().replace(' ', '-')}">${parcel.status}</span></td>
+                        <td>
+                            <div class="btn-group shadow-sm" role="group">
+                                <button class="btn btn-sm btn-info text-white d-flex align-items-center gap-1" onclick="openDriverUpdateStatus('${parcel.parcelId}')" style="background-color: #0EA5E9; border-color: #0EA5E9;">
+                                    🔄 Status
+                                </button>
+                                <button class="btn btn-sm btn-success d-flex align-items-center gap-1" onclick="openDriverUpdateLocation('${parcel.parcelId}')" ${parcel.status !== 'In Transit' ? 'disabled' : ''}>
+                                    📍 Location
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading parcels:', error);
+                document.getElementById('driverParcelsTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading parcels</td></tr>';
+            }
+        }
+
+        function openDriverUpdateStatus(parcelId) {
+            document.getElementById('updateParcelId').value = parcelId;
+            const modal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+            modal.show();
+        }
+
+        async function updateDriverStatus() {
+            const parcelId = document.getElementById('updateParcelId').value;
+            const status = document.getElementById('statusSelect').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/parcels/update-status/${parcelId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage('Status updated successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+                    loadDriverParcels();
+                } else {
+                    showMessage(result.message || 'Error updating status', 'danger');
+                }
+            } catch (error) {
+                showMessage('Error updating status', 'danger');
+            }
+        }
+
+        function openDriverUpdateLocation(parcelId) {
+            document.getElementById('locationParcelId').value = parcelId;
+            const modal = new bootstrap.Modal(document.getElementById('updateLocationModal'));
+            modal.show();
+        }
+
+        async function updateDriverLocation() {
+            const parcelId = document.getElementById('locationParcelId').value;
+            const location = document.getElementById('locationInput').value;
+            const driverId = sessionStorage.getItem('userRole') === 'driver' ? sessionStorage.getItem('userId') : 'UNKNOWN';
+            // wait, we need driverId, but we can get it from token, or the endpoint uses the body.
+            // Let's decode token to get userId or fetch profile
+            // For now, let's just pass a placeholder since the route /update-location requires driverId. 
+            // Wait! The /update-location route in parcelRoutes.js requires driverId in body.
+
+            // Let's fetch the logged in profile first to get driverId (which is user.userId)
+            let dId = 'DRIVER';
+            try {
+                const profileRes = await fetch(`${API_BASE_URL}/auth/profile`);
+                const profile = await profileRes.json();
+                dId = profile.userId;
+            } catch (e) { }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/parcels/update-location`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parcelId, driverId: dId, location })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage('Location updated successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('updateLocationModal')).hide();
+                    document.getElementById('locationInput').value = '';
+                } else {
+                    showMessage(result.message || 'Error updating location', 'danger');
+                }
+            } catch (error) {
+                showMessage('Error updating location', 'danger');
+            }
+        }
+    </script>
+</body>
+
+</html>

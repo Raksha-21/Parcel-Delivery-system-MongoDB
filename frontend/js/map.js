@@ -1,5 +1,7 @@
 // Map functionality for parcel tracking
 let trackingPolyline = null;
+let markers = {};
+let marker; // Keeping this for backward compatibility if needed in other places
 
 function clearTrackingPolyline() {
     if (trackingPolyline) {
@@ -24,29 +26,26 @@ function initMap() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
-
-    // Add a default marker
-    marker = L.marker([defaultLat, defaultLng]).addTo(map)
-        .bindPopup('Parcel Location')
-        .openPopup();
 }
 
 // Update map marker position
-function updateMapMarker(lat, lng, options = {}) {
-    if (marker) {
-        marker.setLatLng([lat, lng]);
-        map.setView([lat, lng], 15);
-        const { locationName, destinationName } = options || {};
-        const safeLocation = locationName ? String(locationName) : null;
-        const safeDestination = destinationName ? String(destinationName) : null;
-        const parts = [];
-        parts.push(`<strong>Parcel Location</strong>`);
-        if (safeLocation) parts.push(`Place: ${safeLocation}`);
-        if (safeDestination) parts.push(`Destination: ${safeDestination}`);
-        parts.push(`Lat: ${lat.toFixed(6)}`);
-        parts.push(`Lng: ${lng.toFixed(6)}`);
-        marker.bindPopup(parts.join('<br>')).openPopup();
+function updateMapMarker(parcelId, lat, lng, options = {}) {
+    if (markers[parcelId]) {
+        markers[parcelId].setLatLng([lat, lng]);
+    } else {
+        markers[parcelId] = L.marker([lat, lng]).addTo(map);
     }
+    map.setView([lat, lng], 15);
+    const { locationName, destinationName } = options || {};
+    const safeLocation = locationName ? String(locationName) : null;
+    const safeDestination = destinationName ? String(destinationName) : null;
+    const parts = [];
+    parts.push(`<strong>Parcel Location (${parcelId})</strong>`);
+    if (safeLocation) parts.push(`Place: ${safeLocation}`);
+    if (safeDestination) parts.push(`Destination: ${safeDestination}`);
+    parts.push(`Lat: ${lat.toFixed(6)}`);
+    parts.push(`Lng: ${lng.toFixed(6)}`);
+    markers[parcelId].bindPopup(parts.join('<br>')).openPopup();
 }
 
 // Track parcel function
@@ -85,15 +84,18 @@ async function trackParcel() {
         currentParcelStatus = parcel.status;
         clearTrackingPolyline();
 
-        // Allow manual location updates only when parcel is in transit.
-        if (parcel.driverId && parcel.status === 'In Transit') {
-            document.getElementById('locationControls').style.display = 'block';
-            currentParcelId = parcelId;
-            currentDriverId = parcel.driverId;
-        } else {
-            document.getElementById('locationControls').style.display = 'none';
-            currentParcelId = null;
-            currentDriverId = null;
+        // Always set the current parcel ID so socket events work
+        currentParcelId = parcelId;
+        currentDriverId = parcel.driverId || null;
+
+        // Allow manual location updates only when parcel is in transit (for Admin/Driver)
+        const locControls = document.getElementById('locationControls');
+        if (locControls) {
+            if (parcel.driverId && parcel.status === 'In Transit') {
+                locControls.style.display = 'block';
+            } else {
+                locControls.style.display = 'none';
+            }
         }
 
         // Get tracking data
@@ -103,13 +105,13 @@ async function trackParcel() {
         if (trackingData.length > 0) {
             // Show the latest location
             const latestLocation = trackingData[0]; // Already sorted by timestamp desc
-            updateMapMarker(latestLocation.latitude, latestLocation.longitude, {
+            updateMapMarker(parcelId, latestLocation.latitude, latestLocation.longitude, {
                 locationName: latestLocation.locationName,
                 destinationName: currentDestinationName
             });
 
             if (parcel.status === 'Delivered') {
-                marker.bindPopup('Parcel Delivered ✔<br>Final Location Reached').openPopup();
+                if (markers[parcelId]) markers[parcelId].bindPopup('Parcel Delivered ✔<br>Final Location Reached').openPopup();
                 showMessage('Parcel Delivered ✔ Final Location Reached', 'success');
             }
 
@@ -138,21 +140,22 @@ async function trackParcel() {
             }
 
             if (hasValidCoordinates(initialLat, initialLng)) {
-                updateMapMarker(initialLat, initialLng, { destinationName: currentDestinationName });
+                updateMapMarker(parcelId, initialLat, initialLng, { destinationName: currentDestinationName });
             } else {
                 map.setView([40.7128, -74.0060], 10);
-                marker.setLatLng([40.7128, -74.0060]);
+                if (!markers[parcelId]) markers[parcelId] = L.marker([40.7128, -74.0060]).addTo(map);
+                else markers[parcelId].setLatLng([40.7128, -74.0060]);
             }
 
             if (parcel.status === 'Delivered') {
-                marker.bindPopup('Parcel Delivered ✔<br>Final Location Reached').openPopup();
+                if (markers[parcelId]) markers[parcelId].bindPopup('Parcel Delivered ✔<br>Final Location Reached').openPopup();
                 showMessage('Parcel Delivered ✔ Final Location Reached', 'success');
             } else if (hasValidCoordinates(initialLat, initialLng)) {
-                marker.bindPopup('Showing assigned driver current location as initial position').openPopup();
+                if (markers[parcelId]) markers[parcelId].bindPopup('Showing assigned driver current location as initial position').openPopup();
             } else if (parcel.driverId) {
-                marker.bindPopup('No tracking data available and driver has no current coordinates yet.').openPopup();
+                if (markers[parcelId]) markers[parcelId].bindPopup('No tracking data available and driver has no current coordinates yet.').openPopup();
             } else {
-                marker.bindPopup(`No tracking data and no assigned driver.<br>Pickup: ${parcel.pickupAddress}`).openPopup();
+                if (markers[parcelId]) markers[parcelId].bindPopup(`No tracking data and no assigned driver.<br>Pickup: ${parcel.pickupAddress}`).openPopup();
             }
         }
 
@@ -200,7 +203,7 @@ async function updateLocation() {
         if (response.ok) {
             showMessage('Location updated successfully!', 'success');
             // Update map immediately, even if socket event is delayed.
-            updateMapMarker(result.tracking.latitude, result.tracking.longitude, {
+            updateMapMarker(currentParcelId, result.tracking.latitude, result.tracking.longitude, {
                 locationName: result.tracking.locationName || result.resolvedLocation?.query,
                 destinationName: currentDestinationName
             });
