@@ -1,5 +1,5 @@
 // API URL
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://parcel-backend-enlb.onrender.com/api';
 
 // Helper function to show messages
 function showMessage(msg, type = 'success') {
