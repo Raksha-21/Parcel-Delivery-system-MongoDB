@@ -212,11 +212,11 @@
         async function updateDriverLocation() {
             const parcelId = document.getElementById('locationParcelId').value;
             const location = document.getElementById('locationInput').value;
-            const driverId = sessionStorage.getItem('userRole') === 'driver' ? sessionStorage.getItem('userId') : 'UNKNOWN';
-            // wait, we need driverId, but we can get it from token, or the endpoint uses the body.
-            // Let's decode token to get userId or fetch profile
-            // For now, let's just pass a placeholder since the route /update-location requires driverId. 
-            // Wait! The /update-location route in parcelRoutes.js requires driverId in body.
+            
+            if (!location || !location.trim()) {
+                showMessage('Please enter a location name', 'warning');
+                return;
+            }
 
             // Let's fetch the logged in profile first to get driverId (which is user.userId)
             let dId = 'DRIVER';
@@ -226,11 +226,30 @@
                 dId = profile.userId;
             } catch (e) { }
 
+            const postData = { parcelId, driverId: dId, location };
+
+            // Geocode on frontend to bypass Render server IP block
+            try {
+                const encoded = encodeURIComponent(location.trim());
+                const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encoded}`, {
+                    headers: { 'User-Agent': 'LogiTrack/1.0 (learning-project)' }
+                });
+                if (geoRes.ok) {
+                    const geoData = await geoRes.json();
+                    if (geoData && geoData.length > 0) {
+                        postData.latitude = parseFloat(geoData[0].lat);
+                        postData.longitude = parseFloat(geoData[0].lon);
+                    }
+                }
+            } catch (e) {
+                console.warn('Frontend geocoding failed, falling back to backend:', e);
+            }
+
             try {
                 const response = await fetch(`${API_BASE_URL}/parcels/update-location`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ parcelId, driverId: dId, location })
+                    body: JSON.stringify(postData)
                 });
 
                 const result = await response.json();

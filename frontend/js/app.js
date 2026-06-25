@@ -343,6 +343,23 @@ async function addDriver() {
         return;
     }
 
+    // Geocode on frontend to bypass Render server IP block
+    try {
+        const encoded = encodeURIComponent(driverData.locationName.trim());
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encoded}`, {
+            headers: { 'User-Agent': 'LogiTrack/1.0 (learning-project)' }
+        });
+        if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData && geoData.length > 0) {
+                driverData.latitude = parseFloat(geoData[0].lat);
+                driverData.longitude = parseFloat(geoData[0].lon);
+            }
+        }
+    } catch (e) {
+        console.warn('Frontend geocoding failed, falling back to backend:', e);
+    }
+
     try {
         const response = await fetch(`${API_BASE_URL}/drivers/add`, {
             method: 'POST',
@@ -405,6 +422,23 @@ async function updateDriver() {
     if (!driverData.locationName || !driverData.locationName.trim()) {
         showMessage('Please provide a valid place name for the driver location', 'warning');
         return;
+    }
+
+    // Geocode on frontend to bypass Render server IP block
+    try {
+        const encoded = encodeURIComponent(driverData.locationName.trim());
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encoded}`, {
+            headers: { 'User-Agent': 'LogiTrack/1.0 (learning-project)' }
+        });
+        if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData && geoData.length > 0) {
+                driverData.latitude = parseFloat(geoData[0].lat);
+                driverData.longitude = parseFloat(geoData[0].lon);
+            }
+        }
+    } catch (e) {
+        console.warn('Frontend geocoding failed, falling back to backend:', e);
     }
 
     try {
